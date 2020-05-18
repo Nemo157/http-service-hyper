@@ -1,0 +1,32 @@
+[package]
+authors = [
+    "Aaron Turon <aturon@mozilla.com>",
+    "Yoshua Wuyts <yoshuawuyts@gmail.com>",
+    "Wonwoo Choi <chwo9843@gmail.com>",
+]
+description = "HttpService server that uses Hyper as backend"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+name = "http-service-hyper"
+repository = "https://github.com/rustasync/http-service"
+documentation = "https://docs.rs/http-service-hyper"
+version = "0.5.0"
+
+[dependencies]
+http = "0.2.1"
+http-service = "0.5.0"
+hyper = { version = "0.13.5", default-features = false, features = ["stream"] }
+tower-service = "0.3.0"
+tokio-util = { version = "0.3.1", features = ["compat"] }
+futures = { version = "0.3", default-features = false }
+http-types = { version = "1.2.0", features = ["hyperium_http"] }
+futures_codec = "0.4.0"
+pin-project-lite = "0.1.5"
+
+[features]
+default = ["runtime"]
+runtime = ["hyper/runtime"]
+
+[dev-dependencies]
+smol = "0.1.8"
+futures = { version = "0.3", features = ["thread-pool"] }
