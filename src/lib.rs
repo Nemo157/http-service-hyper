@@ -69,7 +69,7 @@ where
     H::ResponseError: Into<http_service::Error> + Send + Sync + 'static,
 {
     type Response = hyper::Response<hyper::Body>;
-    type Error = http_service::Error;
+    type Error = Box<dyn std::error::Error + Send + Sync>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -79,7 +79,7 @@ where
     fn call(&mut self, req: hyper::Request<hyper::Body>) -> Self::Future {
         fn convert(
             mut req: hyper::Request<hyper::Body>,
-        ) -> Result<http_types::Request, http_service::Error> {
+        ) -> Result<http_types::Request, Box<dyn std::error::Error + Send + Sync>> {
             let uri = std::mem::take(req.uri_mut());
             let mut parts = uri.into_parts();
             parts.scheme = Some(http::uri::Scheme::HTTP);
@@ -106,13 +106,24 @@ where
         });
 
         Box::pin(async move {
-            let res = res?.await.map_err(Into::into)?;
-            let res: hyper::Response<http_types::Body> = res.into();
-            let (parts, body) = res.into_parts();
-            let stream = futures_codec::FramedRead::new(body, futures_codec::BytesCodec);
-            let body = hyper::Body::wrap_stream(stream);
-            let res = hyper::Response::from_parts(parts, body);
-            Ok(res)
+            let res = res?.await;
+            match res {
+                Ok(res) => {
+                    let res: hyper::Response<http_types::Body> = res.into();
+                    let (parts, body) = res.into_parts();
+                    let stream = futures_codec::FramedRead::new(body, futures_codec::BytesCodec);
+                    let body = hyper::Body::wrap_stream(stream);
+                    let res = hyper::Response::from_parts(parts, body);
+                    Ok(res)
+                }
+                Err(err) => {
+                    let err = err.into();
+                    let res = hyper::Response::builder()
+                        .status(http::StatusCode::from(err.status()))
+                        .body(err.status().canonical_reason().into())?;
+                    Ok(res)
+                }
+            }
         })
     }
 }
